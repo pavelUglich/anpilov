@@ -45,17 +45,6 @@ std::complex<double> residual(std::complex<double> alpha, std::complex<double> k
 }
 
 
-/*std::vector<double> poly(double kappa, double step, const std::function<std::vector<double>(double, double)>& f) {
-	std::vector<double> result;
-	double a = 0;
-	double b = 1.5 * kappa;
-	for (int i = a; i < b; i += step) {
-		double c = f(i, kappa)[1];
-		double d = f(i, kappa)[0];
-		result.push_back(c / d);
-	}
-	return result;
-}*/
 
 std::vector<std::complex<double>> expon(double kappa, double step, double x1) {
 	std::vector<std::complex<double>> result;
@@ -245,6 +234,8 @@ void plotTheWaveField(const std::map<double, std::complex<double>>& waveField, c
 // 4. Вычисляем целевую функцию
 
 std::vector<std::complex<double>> observed(const std::vector<double>& points, double kappa) {
+	Parameters::smooth_params[0] = [=](auto x) {return 1 + x; };
+	Parameters::smooth_params[1] = [=](auto x) {return 1; };
 	std::vector<std::complex<double>> result;
 	auto fun = [=](double alpha, double kappa) {
 		return defOnTop({ alpha,0 }, kappa);
@@ -264,40 +255,67 @@ std::vector<std::complex<double>> observed(const std::vector<double>& points, do
 	return result;
 }
 
-void set_parameters(const std::vector<double>& parameters) {
-	Parameters::smooth_params.clear();
-	Parameters::smooth_params.push_back([=](double x) {return 1 + parameters[0] * x + parameters[1] * (1 - x);});
-	Parameters::smooth_params.push_back([=](double x) {return 1 + parameters[2] * x + parameters[3] * (1 - x);});
-}
-
-double objective(const std::vector<double>& parameters, double kappa, const std::vector<std::complex<double>>& observe, const std::vector<double>& points) {
-	double result;
-	set_parameters(parameters);
-	auto pf = observed(points, kappa);
-	for (size_t i = 0; i < pf.size(); i++)
+std::vector<std::complex<double>> reconstructed(const std::vector<double>& parameters,
+	const std::vector<double>& points, double kappa)
+{
+	Parameters::smooth_params[0] = [=](auto x) {return 1 + parameters[0] * (1 - x) + parameters[1] * x; };;
+	Parameters::smooth_params[1] = [=](auto x) {return 1; };
+	std::vector<std::complex<double>> result;
+	auto fun = [=](double alpha, double kappa) {
+		return defOnTop({ alpha,0 }, kappa);
+	};
+	auto fun_imag = [=](double alpha, double kappa) {
+		return defOnTop({ 0,alpha }, kappa);
+	};
+	auto u = [=](double alpha, double kappa) {
+		return defOnTop({ alpha,0 }, kappa);
+	};
+	const auto roots = get_roots(kappa);
+	const auto reses = reses_set(roots, kappa);
+	for (auto point : points)
 	{
-		result += abs(pf[i] - observe[i]) * abs(pf[i] - observe[i]);
+		result.push_back(waves(point, kappa, roots, reses));
 	}
 	return result;
 }
 
+double fitness(const std::vector<double>& parameters,
+	const std::vector<double>& points,
+	const std::vector<std::complex<double>>& observ, double kappa)
+{
+	double res = 0;
+	if (points.size() != observ.size())
+	{
+		throw std::invalid_argument("������������� �����");
+	}
+	auto res1 = reconstructed(parameters, points, kappa);
+	for (size_t i = 0; i < points.size(); i++) {
+		res += abs(res1[i] - observ[i]) * abs(res1[i] - observ[i]);// +res;
+	}
+	return res;
 
-// objective class example
+}
+
 template <typename T>
 class MyObjective
 {
 public:
-	// objective function example : Rosenbrock function
-	// minimizing f(x,y) = (1 - x)^2 + 100 * (y - x^2)^2
-
-	// ����� ���� ������� �������
+	static double kappa;
 	static std::vector<T> Objective(const std::vector<T>& x)
 	{
-		T obj = -(pow(1 - x[0], 2) + 100 * pow(x[1] - x[0] * x[0], 2));
+		std::vector<double> xx;// = rand_vec(64, 0,6.18);
+		for (size_t i = 0; i < 10; ++i)
+		{
+			xx.push_back(0.3 * i);
+		}
+
+		const auto observed_data = observed(xx, kappa);
+		auto f = [=](const std::vector<double>& x) {return fitness(x, xx, observed_data, kappa); };
+		T obj = -f(x);///(pow(1 - x[0], 2) + 100 * pow(x[1] - x[0] * x[0], 2));
 		return { obj };
 	}
-	// NB: GALGO maximize by default so we will maximize -f(x,y)
 };
+
 
 // constraints example:
 // 1) x * y + x - y + 1.5 <= 0
@@ -305,8 +323,18 @@ public:
 template <typename T>
 std::vector<T> MyConstraint(const std::vector<T>& x)
 {
-	return { x[0] * x[1] + x[0] - x[1] + 1.5,10 - x[0] * x[1] };
+	return { -x[0], -x[1],x[0] - 1,x[1] - 1 };
 }
+
+/*
+void set_parameters(const std::vector<double>& parameters) {
+	Parameters::smooth_params.clear();
+	Parameters::smooth_params.push_back([=](double x) {return 1 + parameters[0] * x + parameters[1] * (1 - x);});
+	Parameters::smooth_params.push_back([=](double x) {return 1;});
+}
+*/
+
+double MyObjective<double>::kappa = 1.0;
 
 int main()
 {
@@ -316,8 +344,9 @@ int main()
 	Parameters::smooth_params.push_back([](double x) {return 1 + exp(-x);});//1+0.5*sin(Pi*x)//1+x//1+exp(-x)
 	Parameters::smooth_params.push_back([](double x) {return 1;});
 	// defining lower bound LB and upper bound UB
+	
 	std::vector<double> LB({ 0.0,0.0 });
-	std::vector<double> UB({ 1.0,13.0 });
+	std::vector<double> UB({ 1.0,1.0 });
 
 	// initiliazing genetic algorithm
 	galgo::GeneticAlgorithm<double> ga(MyObjective<double>::Objective, 100, LB, UB, 50, true);
