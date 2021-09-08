@@ -31,6 +31,7 @@ double defOnTop(std::complex<double> alpha, std::complex<double> kappa) {
 	auto solution = cauchy_problem.solve(0, 1, { 0, 1 });
 	return solution[1].real();
 }
+
 std::complex<double> residual(std::complex<double> alpha, std::complex<double> kappa) {
 	const auto mu = Parameters::smooth_params[0];
 	const auto rho = Parameters::smooth_params[1];
@@ -43,8 +44,6 @@ std::complex<double> residual(std::complex<double> alpha, std::complex<double> k
 	auto solution = cauchy_problem.solve(0, 1, { 0, 1, 0, 0 });
 	return solution[0] / solution[3];
 }
-
-
 
 std::vector<std::complex<double>> expon(double kappa, double step, double x1) {
 	std::vector<std::complex<double>> result;
@@ -167,7 +166,7 @@ std::vector<std::complex<double>> get_roots(double kappa) {
 	// вычисляем два вектора корней и сливаем в один
 	auto real_roots = find_roots(0, 1.5 * kappa, fun, 20);
 	for (int i = 0;i < real_roots.size();i++) {
-		std::complex<double> re = {real_roots[i], 0};
+		std::complex<double> re = { real_roots[i], 0 };
 		result.push_back(re);
 	}
 	auto imag_roots = find_roots(0, 50, fun_imag, 20);
@@ -178,7 +177,18 @@ std::vector<std::complex<double>> get_roots(double kappa) {
 	return result;
 }
 
-std::vector<std::complex<double>> reses_set(const std::vector<std::complex<double>> & roots, double kappa) {
+std::vector<std::complex<double>> getRoots(double kappa, const std::function<double(double, double)>& f) {
+	std::vector<std::complex<double>> result;
+	auto ff = [kappa, f](double alpha) {return f(alpha, kappa);};
+	auto r_roots = find_roots(0, 1.5 * kappa, ff, 20);
+	for (int i = 0;i < r_roots.size();i++) {
+		std::complex<double> re = { r_roots[i], 0 };
+		result.push_back(re);
+	}
+	return result;
+}
+
+std::vector<std::complex<double>> reses_set(const std::vector<std::complex<double>>& roots, double kappa) {
 	std::vector<std::complex<double>> result;
 	for (int i = 0;i < roots.size();i++) {
 		result.push_back(residual(roots[i], kappa));
@@ -186,7 +196,7 @@ std::vector<std::complex<double>> reses_set(const std::vector<std::complex<doubl
 	return result;
 }
 
-std::complex<double> waves(double x1, double kappa, const std::vector<std::complex<double>> & roots, const std::vector<std::complex<double>>& residuals) {
+std::complex<double> waves(double x1, double kappa, const std::vector<std::complex<double>>& roots, const std::vector<std::complex<double>>& residuals) {
 	std::complex<double> result = 0;
 	std::complex<double> im = { 0,1 };
 	for (int i = 0; i < roots.size(); i++) {
@@ -197,7 +207,7 @@ std::complex<double> waves(double x1, double kappa, const std::vector<std::compl
 
 std::map<double, std::complex<double>> wave_field(double a, double b, double kappa, double step, const std::vector<std::complex<double>>& roots, const std::vector<std::complex<double>>& residuals) {
 	std::map<double, std::complex<double>> result;
-	for (double i = a; i < b; i+=step) {
+	for (double i = a; i < b; i += step) {
 		result[i] = waves(i, kappa, roots, residuals);
 	}
 	return result;
@@ -210,7 +220,7 @@ void plotTheWaveField(const std::map<double, std::complex<double>>& waveField, c
 	os << "\\begin{axis}[grid]\n";
 	os << "\\addplot[smooth, red] plot coordinates{\n";
 	for (auto x : waveField) {
-		os << "(" << x.first << ", " << x.second.real()   << ") ";
+		os << "(" << x.first << ", " << x.second.real() << ") ";
 	}
 	os << "};\n";
 	os << "\\addplot[smooth, blue] plot coordinates{\n";
@@ -222,7 +232,6 @@ void plotTheWaveField(const std::map<double, std::complex<double>>& waveField, c
 	os << "\\end{tikzpicture}\n";
 	os.close();
 }
-
 
 // 1. Найти наблюдаемое поле std::vector<std::complex<double>> observed(const std::vector<double> & points, double kappa)
 // целевая функция (double objective(const std::vector<double> & parameters, double kappa, const std::vector<std::complex<double>> & observed))
@@ -336,27 +345,112 @@ void set_parameters(const std::vector<double>& parameters) {
 
 double MyObjective<double>::kappa = 1.0;
 
+
+
+//========================================================================================================================================================
+//========================================================================================================================================================
+
+std::vector<std::complex<double>> add_ker(std::complex<double> alpha, std::complex<double> kappa, double n, double x1) {
+	std::vector<double> points;
+	for (int i = 0; i < n;i++) {
+		points.push_back((i + 0.5) / n);
+	}
+	const auto mu = Parameters::smooth_params[0];
+	const auto rho = Parameters::smooth_params[1];
+	std::complex<double> im = { 0,1 };
+	OdeSolver<std::complex<double>> cauchy_problem = { {
+	[=](double x, const std::vector<std::complex<double>>& v) {return v[1] / mu(x); },
+	[=](double x, const std::vector<std::complex<double>>& v) {return (alpha * alpha * mu(x) - kappa * kappa * rho(x)) * v[0]; },
+	[=](double x, const std::vector<std::complex<double>>& v) {return v[3] / mu(x); },
+	[=](double x, const std::vector<std::complex<double>>& v) {return 2.0 * alpha * v[0] + (alpha * alpha * mu(x) - kappa * kappa * rho(x)) * v[2]; },
+	[=](double x, const std::vector<std::complex<double>>& v) {return v[5] / mu(x); },
+	[=](double x, const std::vector<std::complex<double>>& v) {return 2.0 * v[0] + 4.0 * alpha * v[2] + (alpha * alpha * mu(x) - kappa * kappa * rho(x)) * v[4]; },
+	}, 0.1e-6, RUNGE_KUTTA_FELDBERG };
+	auto solution = cauchy_problem.solve(points, { 0, 1, 0, 0, 0, 0 });
+	std::vector<std::complex<double>> result;
+	for (auto x : solution) {
+		auto item = (2.0 * x[0] * (x[2] - x[0] * x[5] / x[3]) - im * x[0] * x[0] * x1) / x[3] / x[3];
+		result.push_back(item);
+	}
+	return result;
+}
+/*
+std::complex<double> kernel(double x1, double n, double kappa, const std::vector<std::complex<double>>& roots) {
+	std::complex<double> result = 0;
+	std::complex<double> im = { 0,1 };
+	std::vector<std::complex<double>> ker;
+	for (int i = 0;i < roots.size();i++) {
+		ker.push_back(add_ker(roots[i], kappa, n, x1));
+	}
+	for (int i = 0; i < roots.size(); i++) {
+		result += im * ker[i] * exp(im * roots[i] * x1);
+	}
+	return result;
+}
+
+std::complex<double> Simpson(double n, double kappa, const std::vector<std::complex<double>>& roots, const std::function<std::complex<double>(double)>& rho) {
+	std::complex<double> result = 0;
+	double step = 1 / n;
+	for (int i = 0;i < n;i += 1) {
+		const double l = step * i;
+		const double r = l + step;
+		std::complex<double> fl = kernel(n, l,kappa,roots)*rho(l);
+		std::complex<double> fr = kernel(n, r, kappa, roots)*rho(r);
+		std::complex<double> fm = kernel(n, (l + r) * 0.5,kappa,roots)*rho((l+r)*0.5);
+		result += (fl + 4.0 * fm + fr) * (r - l) / 6.0;
+	}
+	return kappa*kappa*result;
+}
+*/
+std::vector<std::vector<std::complex<double>>> MatrixV(std::complex<double> alpha, std::complex<double> kappa, double n, double x1, double rows, double c, double d) {
+	std::vector<std::vector<std::complex<double>>> matrix;
+	std::vector<double> points;
+	for (int k = 0; k < rows;k++) {
+		points.push_back(c + k * (d - c) / rows);
+	}
+	for (size_t i = 0;i < rows;i++) {
+		matrix.push_back(add_ker(alpha, kappa, n, points[i]));
+	}
+	return matrix;
+}
+
+//========================================================================================================================================================
+//========================================================================================================================================================
+
+
+
 int main()
 {
 	setlocale(0, "");
+
+	/*
+
 	//std::cout << defOnTop({ 0, 1.0 }, 2.1) << std::endl;
 	// построить дисперсионные кривые для разгых законов изменения неоднородности (1+sin(pi*x), 1+exp(-x))
 	Parameters::smooth_params.push_back([](double x) {return 1 + exp(-x);});//1+0.5*sin(Pi*x)//1+x//1+exp(-x)
 	Parameters::smooth_params.push_back([](double x) {return 1;});
 	// defining lower bound LB and upper bound UB
-	
+
 	std::vector<double> LB({ 0.0,0.0 });
 	std::vector<double> UB({ 1.0,1.0 });
 
-	// initiliazing genetic algorithm
+	//initiliazing genetic algorithm
 	galgo::GeneticAlgorithm<double> ga(MyObjective<double>::Objective, 100, LB, UB, 50, true);
 
-	// setting constraints
+	//setting constraints
 	ga.Constraint = MyConstraint;
 
-	// running genetic algorithm
+	//running genetic algorithm
 	ga.run();
+
+	*/
+
 	double kappa = 10.0;
+	double rho0 = 1;
+	double c = 1;
+	double d = 2;
+
+	/*
 	auto fun = [=](double alpha, double kappa) {
 		return defOnTop({ alpha,0 }, kappa);
 	};
@@ -377,6 +471,20 @@ int main()
 	const auto reses = reses_set(roots, kappa);
 	auto wf = wave_field(0, 1, 0, 0.01, roots, reses);
 	plotTheWaveField(wf, "5text.txt");
+	*/
+
+	Parameters::smooth_params.push_back([](double x) {return 1;});
+	Parameters::smooth_params.push_back([](double x) {return exp(x);});
+	auto fun = [=](double alpha, double kappa) {
+		return defOnTop({ alpha,0 }, kappa);
+	};
+	auto d_s = dispersional_set(10, 0.1, 20, fun);
+	plotTheDispersionalCurves(d_s, "1text.txt");
+	const auto rts = getRoots(kappa, fun);
+	const auto r_s = reses_set(rts, kappa);
+	auto w_f = wave_field(c, d, kappa, 0.1, rts, r_s);
+	plotTheWaveField(w_f, "2text.txt");
+
 	system("pause");
 
 }
