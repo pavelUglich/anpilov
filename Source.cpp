@@ -242,6 +242,9 @@ void plotTheWaveField(const std::map<double, std::complex<double>>& waveField, c
 // 3. Находим поле перемещений, соответствующее параметрам parameters в тех же точках points
 // 4. Вычисляем целевую функцию
 
+
+
+
 std::vector<std::complex<double>> observed(const std::vector<double>& points, double kappa) {
 	Parameters::smooth_params[0] = [=](auto x) {return 1 + x; };
 	Parameters::smooth_params[1] = [=](auto x) {return 1; };
@@ -402,22 +405,41 @@ std::complex<double> Simpson(double n, double kappa, const std::vector<std::comp
 	return kappa*kappa*result;
 }
 */
-std::vector<std::vector<std::complex<double>>> MatrixV(std::complex<double> alpha, std::complex<double> kappa, double n, double x1, double rows, double c, double d) {
+std::vector<std::vector<std::complex<double>>> MatrixV(std::complex<double> alpha, std::complex<double> kappa, double n, std::vector<double> points, double rows) {
 	std::vector<std::vector<std::complex<double>>> matrix;
-	std::vector<double> points;
-	for (int k = 0; k < rows;k++) {
-		points.push_back(c + k * (d - c) / rows);
-	}
 	for (size_t i = 0;i < rows;i++) {
 		matrix.push_back(add_ker(alpha, kappa, n, points[i]));
 	}
 	return matrix;
 }
 
+
+// перегрузка observed
+std::vector<std::complex<double>> observed(const std::vector<double>& points, double kappa,
+	const std::function<double(double)>& mu, const std::function<double(double)>& rho) {
+	Parameters::smooth_params[0] = mu;//[=](auto x) {return 1 + x; };
+	Parameters::smooth_params[1] = rho;//[=](auto x) {return 1; };
+	std::vector<std::complex<double>> result;
+	auto fun = [=](double alpha, double kappa) {
+		return defOnTop({ alpha,0 }, kappa);
+	};
+	auto fun_imag = [=](double alpha, double kappa) {
+		return defOnTop({ 0,alpha }, kappa);
+	};
+	auto u = [=](double alpha, double kappa) {
+		return defOnTop({ alpha,0 }, kappa);
+	};
+	const auto roots = get_roots(kappa);
+	const auto reses = reses_set(roots, kappa);
+	for (auto point : points)
+	{
+		result.push_back(waves(point, kappa, roots, reses));
+	}
+	return result;
+}
+
 //========================================================================================================================================================
 //========================================================================================================================================================
-
-
 
 int main()
 {
@@ -447,6 +469,8 @@ int main()
 
 	double kappa = 10.0;
 	double rho0 = 1;
+	double rows = 5;
+	double n = 5;
 	double c = 1;
 	double d = 2;
 
@@ -472,7 +496,7 @@ int main()
 	auto wf = wave_field(0, 1, 0, 0.01, roots, reses);
 	plotTheWaveField(wf, "5text.txt");
 	*/
-
+	
 	Parameters::smooth_params.push_back([](double x) {return 1;});
 	Parameters::smooth_params.push_back([](double x) {return exp(x);});
 	auto fun = [=](double alpha, double kappa) {
@@ -483,7 +507,20 @@ int main()
 	const auto rts = getRoots(kappa, fun);
 	const auto r_s = reses_set(rts, kappa);
 	auto w_f = wave_field(c, d, kappa, 0.1, rts, r_s);
-	plotTheWaveField(w_f, "2text.txt");
+	plotTheWaveField(w_f, "2text.txt");*/
+	/*
+	auto u = [=](double alpha, double kappa) {
+		return defOnTop({ alpha,0 }, kappa);
+	};
+	auto set_re = dispersional_set(10, 0.2, 20, u);*/
+
+	std::vector<double> points;
+	for (int k = 0; k < rows;k++) {
+		points.push_back(c + k * (d - c) / rows);
+	}
+
+	std::vector<std::complex<double>> Vector1 = observed(points, kappa, [=](auto x) {return 1 + x;}, [=](auto x) {return 1;});
+	std::vector<std::vector<std::complex<double>>> Matrix1 = MatrixV(, kappa, n, points, rows);
 
 	system("pause");
 
