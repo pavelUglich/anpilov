@@ -19,10 +19,15 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="IterativeProcess.cpp" />
+    <ClCompile Include="Layer.cpp" />
+    <ClCompile Include="MatrixSystem.cpp" />
     <ClCompile Include="Parameters.cpp" />
     <ClCompile Include="plots.cpp" />
     <ClCompile Include="Source.cpp" />
+    <ClCompile Include="Stabilizer.cpp" />
     <ClCompile Include="vector_ops.cpp" />
+    <ClCompile Include="VoyevodinMethod.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="boundary_value_problem.h" />
@@ -34,12 +39,17 @@
     <ClInclude Include="gen\GeneticAlgorithm.hpp" />
     <ClInclude Include="gen\Population.hpp" />
     <ClInclude Include="gen\Randomize.hpp" />
+    <ClInclude Include="IterativeProcess.h" />
+    <ClInclude Include="Layer.h" />
     <ClInclude Include="Matrix.h" />
+    <ClInclude Include="MatrixSystem.h" />
     <ClInclude Include="OdeSolver.h" />
     <ClInclude Include="Parameters.h" />
     <ClInclude Include="plots.h" />
     <ClInclude Include="SquareMatrix.h" />
+    <ClInclude Include="Stabilizer.h" />
     <ClInclude Include="vector_ops.h" />
+    <ClInclude Include="VoyevodinMethod.h" />
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>16.0</VCProjectVersion>

@@ -103,7 +103,7 @@ std::pair<std::vector<T>, std::vector<T>> OdeSolver<T>::evaluate_uh(
 }
 
 template<class T>
-double OdeSolver<T>::calculate_the_residual(double a, 
+double OdeSolver<T>::calculate_the_residual(double a,
 	const std::vector<T>& initial_conditions, double h, std::vector<T>& u)
 {
 	const auto uh = evaluate_uh(initial_conditions, a, h);
@@ -115,8 +115,8 @@ double OdeSolver<T>::calculate_the_residual(double a,
 
 template <class T>
 OdeSolver<T>::OdeSolver(
-	std::vector<std::function<T(double, const std::vector<T>&)>> functions, 
-	double epsilon,	tableau t) : _equations(std::move(functions))
+	std::vector<std::function<T(double, const std::vector<T>&)>> functions,
+	double epsilon, tableau t) : _equations(std::move(functions))
 {
 	if (epsilon < 0)
 	{
@@ -135,7 +135,7 @@ std::vector<T> OdeSolver<T>::solve(double a, double b, const std::vector<T>& ini
 	}
 	double h = b - a;
 	std::vector<T> initials(initial_conditions);
-	while (abs(b - a) > DBL_EPSILON)
+	while (abs(b - a) > DBL_EPSILON && a < b)
 	{
 		std::vector<T> u_;
 		double r = calculate_the_residual(a, initials, h, u_);
@@ -152,7 +152,7 @@ std::vector<T> OdeSolver<T>::solve(double a, double b, const std::vector<T>& ini
 
 template <class T>
 std::vector<std::vector<T>> OdeSolver<T>::solve(
-	const std::vector<double>& points, 
+	const std::vector<double>& points,
 	const std::vector<T>& initial_conditions)
 {
 	std::vector<std::vector<T>> result;
