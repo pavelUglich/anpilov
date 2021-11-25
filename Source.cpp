@@ -1,6 +1,7 @@
 ﻿#include "Layer.h"
 #include "gen/Galgo.hpp"
-//#include "Source.h"
+#include "VoyevodinMethod.h"
+#include<iostream>
 
 std::vector<std::function<double(double)>> Parameters::smooth_params;
 std::vector<double> Parameters::const_params;
@@ -78,7 +79,7 @@ std::map<double, std::vector<double>> split_sets(const std::map<double, std::vec
 	{
 		result[x.first] = x.second;
 		auto value = right.at(x.first);
-		std::transform(value.begin(), value.end(), value.begin(), [](auto x) {return -x;});
+		std::transform(value.begin(), value.end(), value.begin(), [](auto x) {return -x; });
 		result[x.first].insert(result[x.first].end(), value.begin(), value.end());
 	}
 	return result;
@@ -246,6 +247,14 @@ std::vector<std::complex<double>> observed(const std::vector<double>& points, do
 
 //========================================================================================================================================================
 //========================================================================================================================================================
+template<class T>
+void display(const std::vector<T>& vector) {
+	for (auto t : vector) {
+		cout << t << ", ";
+	}
+	cout << '\n';
+}
+
 
 int main()
 {
@@ -262,31 +271,57 @@ int main()
 
 	*/
 
-	//double kappa = 10.0;
+	double kappa = 1.0;
 	double rho0 = 1;
-	const size_t rows = 5;
-	double columns = 5;
-	double c = 1;
-	double d = 2;
-
+	const size_t rows = 20;
+	double columns = 20;
+	double c = 0;
+	double d = 1;
 	std::vector<double> points;
-	for (int k = 0; k < rows;k++) {
+	for (int k = 0; k < rows; k++) {
 		points.push_back(c + k * (d - c) / rows);
 	}
-
-
-	Parameters::smooth_params.push_back([](double x) {return 1 + x; });
+	/*
 	Parameters::smooth_params.push_back([](double x) {return 1; });
+	Parameters::smooth_params.push_back([](double x) {return 1 + 0.1 * x; });//!!
 
-	double kappa = 5;
-	layer l = {};
-	auto roots = l.getRoots(kappa);
-	auto residual_set = l.residualSet(roots, kappa);
-	auto field = l.observed(points, kappa, residual_set, roots);
-	auto mat = l.MatrixV(kappa, c, d, rows, columns);
-	//std::vector<std::complex<double>> Vector1 = layer//observed(points, kappa, [=](auto x) {return 1 + x;}, [=](auto x) {return 1;});
-	//std::vector<std::vector<std::complex<double>>> Matrix1 = MatrixV(, kappa, columns, points, rows);
+	layer l(kappa);
+	auto field1 = l.observed(points);
+	auto mat = l.MatrixRho(columns, rows, points);
+	*/
 
+	Parameters::smooth_params.emplace_back([](double x) {return 1; });
+	Parameters::smooth_params.emplace_back([](double x) {return 1 + 0.1 * x; });//!!
+
+	layer l(kappa);
+	auto field1 = l.observed(points);
+	//auto mat = l.MatrixRho(columns, rows);
+
+	Parameters::smooth_params[0] = [](double x) {return 1; };
+	Parameters::smooth_params[1] = [](double x) {return 1; };
+	layer l1(kappa);
+	auto field2 = l1.observed(points);
+	auto mat = l1.MatrixRho(columns, rows);
+
+	std::vector<double> field = field1 - field2;
+
+	std::vector<double> exact_solution(points.size());
+	const double h_y = 1.0 / points.size();
+	for (size_t i = 0; i < points.size(); i++)
+	{
+		double x = i * h_y;// *0.01;
+		exact_solution[i] = 0.1 * x;
+	}
+	auto right_part = mat * exact_solution;
+	display(right_part);
+	display(field);
+	/*
+	VoyevodinMethod V = { mat, field, 1.0 / field.size(), Dirichle };
+	auto solution = V.solution();
+	for (size_t i = 0; i < solution.size(); i++)
+	{
+		std::cout << solution[i] << std::endl;
+	}*/
 	system("pause");
-
+	return 0;
 }

@@ -1,26 +1,59 @@
 #include "Layer.h"
 
-//std::vector<std::function<std::complex<double>(double, const std::vector<std::complex<double>>&)>> 
+const std::complex<double> im = { 0,1 };
 
-std::vector<std::function<std::complex<double>(double, const std::vector<std::complex<double>>&)>> layer::get_equation(std::complex<double> alpha, double kappa, size_t size) const
+std::vector<std::function<std::complex<double>(double, const std::vector<std::complex<double>>&)>> layer::get_equation(std::complex<double> alpha, size_t size) const
 {
 	std::vector<std::function<std::complex<double>(double, const std::vector<std::complex<double>>&)>> result(size);
 	for (size_t i = 0; i < result.size(); i++)
 	{
-		result[i] = [=](double x, const std::vector<std::complex<double>>& v) {return this->_equations[i](x, v, alpha, kappa);};
+		result[i] = [=](double x, const std::vector<std::complex<double>>& v) {return this->_equations[i](x, v, alpha, kappa); };
 	}
 	return result;
 }
 
-double layer::defOnTop(std::complex<double> alpha, double kappa) const
+layer::layer(double kkappa): mu(Parameters::smooth_params[0]), rho(Parameters::smooth_params[1])
+{
+	kappa = kkappa;
+	_equations = {
+		[=](double x, const std::vector<std::complex<double>>& v, std::complex<double> alpha, double kappa)
+		{
+			return v[1] / mu(x);
+		},
+		[=](double x, const std::vector<std::complex<double>>& v, std::complex<double> alpha, double kappa)
+		{
+			return (alpha * alpha * mu(x) - kappa * kappa * rho(x)) * v[0];
+		},
+		[=](double x, const std::vector<std::complex<double>>& v, std::complex<double> alpha, double kappa)
+		{
+			return v[3] / mu(x);
+		},
+		[=](double x, const std::vector<std::complex<double>>& v, std::complex<double> alpha, double kappa)
+		{
+			return 2.0 * alpha * v[0] * mu(x) + (alpha * alpha * mu(x) - kappa * kappa * rho(x)) * v[2];
+		},
+		[=](double x, const std::vector<std::complex<double>>& v, std::complex<double> alpha, double kappa)
+		{
+			return v[5] / mu(x);
+		},
+		[=](double x, const std::vector<std::complex<double>>& v, std::complex<double> alpha, double kappa)
+		{
+			return 2.0 * v[0] * mu(x) + 4.0 * v[2] * mu(x)*alpha + (alpha * alpha * mu(x) - kappa * kappa * rho(x)) * v[4];//!!!
+		}
+	};
+	roots = getRoots();
+	residual_set = residualSet();
+}
+
+double layer::defOnTop(std::complex<double> alpha) const
 {
 
-	OdeSolver<std::complex<double>> cauchy_problem = { this->get_equation(alpha, kappa, 2)	, 0.1e-6, RUNGE_KUTTA_FELDBERG };
+	OdeSolver<std::complex<double>> cauchy_problem = { this->get_equation(alpha, 2)	, 0.1e-6, RUNGE_KUTTA_FELDBERG };
 	auto solution = cauchy_problem.solve(0, 1, { 0, 1 });
 	return solution[1].real();
 }
 
-double layer::findRoot(double a, double b, const std::function<double(double)>& f, double epsilon) // !!
+double layer::findRoot(double a, double b, const std::function<double(double)>& f, double epsilon) const
 {
 	while (abs(b - a) > epsilon) {
 		const double fa = f(a);
@@ -31,119 +64,132 @@ double layer::findRoot(double a, double b, const std::function<double(double)>& 
 	return b;
 }
 
-std::vector<double> layer::find_roots(double a, double b, const std::function<double(double)>& f, size_t n, double epsilon)
+std::vector<double> layer::find_roots(double a, double b, const std::function<double(double)>& f, size_t n, double epsilon) const
 {
 	std::vector<double> result;
-	auto step = (b - a) / n;
-	for (int i = 0; i < n; i += 1) {
-		auto left = a + i * step;
-		auto right = left + step;
+	const auto step = (b - a) / n;
+	for (size_t i = 0; i < n; i += 1) {
+		const auto left = a + i * step;
+		const auto right = left + step;
 		if (f(left) * f(right) < 0) {
-			double f_r = findRoot(left, right, f);
+			double f_r = findRoot(left, right, f, epsilon);
 			result.push_back(f_r);
 		}
 	}
 	return result;
 }
 
-std::map<double, std::vector<double>> layer::dispersionalSet(double max_kappa, double step, size_t n, const std::function<double(double, double)>& f)
+std::map<double, std::vector<double>> layer::dispersionalSet(double max_kappa, double step, size_t n, const std::function<double(double, double)>& f) const
 {
 	std::map<double, std::vector<double>> result;
 	double kappa = step;
 	while (kappa < max_kappa) {
-		auto ff = [kappa, f](double alpha) {return f(alpha, kappa);};
+		auto ff = [kappa, f](double alpha) {return f(alpha, kappa); };
 		result[kappa] = find_roots(0, max_kappa, ff, n);
 		kappa += step;
 	}
 	return result;
 }
 
-std::complex<double> layer::waves(double x1, double kappa, const std::vector<std::complex<double>>& roots, const std::vector<std::complex<double>>& residuals)
+std::complex<double> layer::waves(double x1, const std::vector<std::complex<double>>& roots, const std::vector<std::complex<double>>& residuals) const
 {
 	std::complex<double> result = 0;
-	std::complex<double> im = { 0,1 };
-	for (int i = 0; i < roots.size(); i++) {
+	const std::complex<double> im = { 0,1 };
+	for (size_t i = 0; i < roots.size(); i++) {
 		result += im * residuals[i] * exp(im * roots[i] * x1);
 	}
 	return result;
 }
 
-std::map<double, std::complex<double>> layer::waveField(double a, double b, double kappa, double step, const std::vector<std::complex<double>>& roots, const std::vector<std::complex<double>>& residuals)
+std::map<double, std::complex<double>> layer::waveField(double a, double b, double step, const std::vector<std::complex<double>>& residuals) const
 {
 	std::map<double, std::complex<double>> result;
 	for (double i = a; i < b; i += step) {
-		result[i] = waves(i, kappa, roots, residuals);
+		result[i] = waves(i, roots, residuals);
 	}
 	return result;
 }
 
-std::complex<double> layer::residual(std::complex<double> alpha, double kappa)
+std::complex<double> layer::residual(std::complex<double> alpha) const
 {
-	OdeSolver<std::complex<double>> cauchy_problem = { this->get_equation(alpha, kappa, 4)	, 0.1e-6, RUNGE_KUTTA_FELDBERG };
+	OdeSolver<std::complex<double>> cauchy_problem = { this->get_equation(alpha, 4)	, 0.1e-6, RUNGE_KUTTA_FELDBERG };
 	auto solution = cauchy_problem.solve(0, 1, { 0, 1, 0, 0 });
 	return solution[0] / solution[3];
 }
 
-std::vector<std::complex<double>> layer::residualSet(const std::vector<std::complex<double>>& roots, double kappa)
+std::vector<std::complex<double>> layer::residualSet()
 {
-	std::vector<std::complex<double>> result;
-	for (int i = 0;i < roots.size();i++) {
-		result.push_back(residual(roots[i], kappa));
+	std::vector<std::complex<double>> result(roots.size());
+	for (size_t i = 0; i < roots.size(); i++) {
+		result[i] = residual(roots[i]);
 	}
 	return result;
 }
 
-/*std::vector<std::complex<double>> layer::addKer(
-	//std::complex<double> alpha, double kappa, double n, double x1
-	double kappa, double b, double c, size_t rows, size_t columns
-)
+std::vector<std::vector<double>> layer::MatrixRho(size_t columns, size_t rows) const
 {
-	std::vector<std::complex<double>> result;
-	// 3. Делаем расчет по формуле (17)
-	/*
-	std::vector<double> vec;
-	for (int i = 0; i < n;i++) {
-		vec.push_back((i + 0.5) / n);
-	}
-	std::complex<double> im = { 0,1 };
-	OdeSolver<std::complex<double>> cauchy_problem = { this->get_equation(alpha, kappa, 6), 0.1e-6, RUNGE_KUTTA_FELDBERG };
-	auto solution = cauchy_problem.solve(vec, { 0, 1, 0, 0, 0, 0 });
-	std::vector<std::complex<double>> result;
-	for (auto x : solution) {
-		auto item = (2.0 * x[0] * (x[2] - x[0] * x[5] / x[3]) - im * x[0] * x[0] * x1) / x[3] / x[3];
-		result.push_back(item);
-	}
-
-	return result;
-}*/
-
-std::vector<std::vector<std::complex<double>>> layer::MatrixV(double kappa, double c, double d, size_t rows, size_t columns)
-{
-	// 1. Определяем корни
-	// 2. Определяем вычеты в двухкратных полюсах
-	auto roots = getRoots(kappa);
+	const auto h = 1.0 / columns;
 	std::vector<std::vector<std::complex<double>>> mat(roots.size());
-	std::complex<double> im = { 0,1 };
 	std::vector<double> vec;
 	std::vector<std::complex<double>> residuals;
-	for (int i = 0; i < rows;i++) {
+	for (int i = 0; i < rows; i++) {
 		vec.push_back((i + 0.5) / rows);
 	}
-
+	vec.push_back(1.0);
 	for (size_t i = 0; i < roots.size(); i++) {
-		OdeSolver<std::complex<double>> cauchy_problem = { this->get_equation(roots[i], kappa, 6), 0.1e-6, RUNGE_KUTTA_FELDBERG };
+		OdeSolver<std::complex<double>> cauchy_problem = { this->get_equation(roots[i], 6), 0.1e-6, RUNGE_KUTTA_FELDBERG }; // глобальная точность
 		auto solution = cauchy_problem.solve(vec, { 0, 1, 0, 0, 0, 0 });
-		for (size_t ii = 0; ii < solution.size(); ii++)
+		auto denum = cauchy_problem.solve(0,1, { 0, 1, 0, 0, 0, 0 });
+		//auto denum = solution.back(); // denum[5], denum[3]
+		for (size_t ii = 0; ii < solution.size() - 1; ii++)
 		{
-			auto item = (2.0 * solution[ii][0] * (solution[ii][2] - solution[ii][0] * solution[ii][5] / solution[ii][3]) - im * solution[ii][0] * solution[ii][0] * vec[ii]) / solution[ii][3] / solution[ii][3];
+			auto item = (2.0 * solution[ii][0] * (solution[ii][2] - solution[ii][0] * 0.5 * denum[5] / denum[3]) 
+				+ im * solution[ii][0] * solution[ii][0] * vec[ii]) / denum[3] / denum[3];//!!! +
 			mat[i].push_back(item);
 		}
 	}
-
-	std::vector<double> vec1;
+	std::vector<std::vector<std::complex<double>>> result(columns, std::vector<std::complex<double>>(rows, { 0,0 }));
 	for (size_t i = 0; i < columns; i++)
 	{
-		vec1.push_back(c + (d - c) / columns * i);
+		for (size_t j = 0; j < rows; j++) {
+			for (size_t k = 0; k < roots.size(); k++)
+			{
+				result[i][j] += im * exp(im * roots[k] * vec[i]) * mat[k][j] * kappa * kappa;
+			}
+		}
+	}
+	std::vector<std::vector<double>> realresult(columns, std::vector<double>(rows));
+	for (size_t i = 0; i < columns; i++)
+	{
+		for (size_t j = 0; j < rows; j++)
+		{
+			realresult[i][j] += result[i][j].real();
+		}
+	}
+
+	return realresult;
+}
+
+std::vector<std::vector<double>> layer::MatrixMu(size_t columns, size_t rows)
+{
+	const auto h = 1.0 / columns;
+	std::vector<std::vector<std::complex<double>>> mat(roots.size());
+	std::vector<double> vec;
+	std::vector<std::complex<double>> residuals;
+	for (size_t i = 0; i < rows; i++) {
+		vec.push_back((i + 0.5) / rows);
+	}
+	vec.push_back(1.0);
+	for (size_t i = 0; i < roots.size(); i++) {
+		OdeSolver<std::complex<double>> cauchy_problem = { this->get_equation(roots[i], 6), 0.1e-6, RUNGE_KUTTA_FELDBERG };
+		auto solution = cauchy_problem.solve(vec, { 0, 1, 0, 0, 0, 0 });
+		auto denum = solution.back();
+		for (size_t ii = 0; ii < solution.size(); ii++)
+		{
+			auto item = (2.0 * solution[ii][1] * (solution[ii][3] - solution[ii][1] * 0.5 * denum[5] / denum[3]) - im * solution[ii][1] * solution[ii][1] * vec[ii]) / denum[3] / denum[3]
+			+ (2.0 * roots[ii] * solution[ii][0] * (solution[ii][0] + roots[ii] * solution[ii][2] - roots[ii] * solution[ii][0] * denum[5] / denum[3]) - im * roots[ii] * solution[ii][0] * roots[ii] * solution[ii][0] * vec[ii]) / denum[3] / denum[3];
+			mat[i].push_back(item.real());
+		}
 	}
 
 	std::vector<std::vector<std::complex<double>>> result(columns, std::vector<std::complex<double>>(rows, { 0,0 }));
@@ -152,53 +198,51 @@ std::vector<std::vector<std::complex<double>>> layer::MatrixV(double kappa, doub
 		for (size_t j = 0; j < rows; j++) {
 			for (size_t k = 0; k < roots.size(); k++)
 			{
-				result[i][j] += im * exp(im * roots[k] * vec[i]) * mat[k][j];
-			}
+				result[i][j] += im * exp(im * roots[k] * vec[i]) * mat[k][j] * kappa * kappa * h;
+			}	
 		}
 	}
-	return result;
+	std::vector<std::vector<double>> realresult(columns, std::vector<double>(rows));
+	for (size_t i = 0; i < columns; i++)
+	{
+		for (size_t j = 0; j < rows; j++)
+		{
+			realresult[i][j] += result[i][j].real();
+		}
+	}
+	return realresult;
 }
 
-/*std::vector<std::complex<double>> layer::Kernels(std::vector<std::vector<std::complex<double>>> mat)
-{
-	std::vector<std::complex<double>> result;
-	for (size_t i = 0; i < mat.size(); i++)
-	{
-		for (size_t j = 0; j < mat[i].size; i++) {
-			result[i] += mat[i][j];
-		}
-	}
-	return result;
-}*/
-
-std::vector<std::complex<double>> layer::getRoots(double kappa)
+std::vector<std::complex<double>> layer::getRoots()
 {
 	std::vector<std::complex<double>> result;
 	auto fun = [=](double alpha) {
-		return defOnTop({ alpha,0 }, kappa);
+		return defOnTop({ alpha,0 });
 	};
 	auto fun_imag = [=](double alpha) {
-		return defOnTop({ 0,alpha }, kappa);
+		return defOnTop({ 0,alpha });
 	};
 	auto real_roots = find_roots(0, 1.5 * kappa, fun, 20);
-	for (int i = 0;i < real_roots.size();i++) {
-		std::complex<double> re = { real_roots[i], 0 };
-		result.push_back(re);
+	result.reserve(real_roots.size());
+	for (double& real_root : real_roots)
+	{
+		result.emplace_back(real_root, 0);
 	}
 	auto imag_roots = find_roots(0, 50, fun_imag, 20);
-	for (int i = 0;i < imag_roots.size();i++) {
-		std::complex<double> im = { 0, imag_roots[i] };
-		result.push_back(im);
+	for (double& imag_root : imag_roots)
+	{
+		result.emplace_back(0, imag_root);
 	}
 	return result;
 }
 
-std::vector<std::complex<double>> layer::observed(const std::vector<double>& points, double kappa, std::vector<std::complex<double>> residual_set, std::vector<std::complex<double>> roots)
+std::vector<double> layer::observed(const std::vector<double>& points) const
 {
-	std::vector<std::complex<double>> result;
+	std::vector<double> result;
+	result.reserve(points.size());
 	for (auto point : points)
 	{
-		result.push_back(waves(point, kappa, roots, residual_set));
+		result.push_back(waves(point, roots, residual_set).real());
 	}
 	return result;
 }
