@@ -40,6 +40,6 @@ public:
 	std::vector<double> observed(const std::vector<double>& points) const;
 private:
 	std::vector<std::complex<double>> getRoots();
-	//std::vector<std::complex<double>> residualSet();
+	std::vector<std::complex<double>> residualSet();
 };
 

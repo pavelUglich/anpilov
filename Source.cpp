@@ -259,18 +259,6 @@ void display(const std::vector<T>& vector) {
 int main()
 {
 	setlocale(0, "");
-	/*
-	//initiliazing genetic algorithm
-	galgo::GeneticAlgorithm<double> ga(MyObjective<double>::Objective, 100, LB, UB, 50, true);
-
-	//setting constraints
-	ga.Constraint = MyConstraint;
-
-	//running genetic algorithm
-	ga.run();
-
-	*/
-
 	double kappa = 1.0;
 	double rho0 = 1;
 	const size_t rows = 20;
@@ -278,32 +266,25 @@ int main()
 	double c = 0;
 	double d = 1;
 	std::vector<double> points;
-	for (int k = 0; k < rows; k++) {
+	for (size_t k = 0; k < rows; k++) {
 		points.push_back(c + k * (d - c) / rows);
 	}
-	/*
-	Parameters::smooth_params.push_back([](double x) {return 1; });
-	Parameters::smooth_params.push_back([](double x) {return 1 + 0.1 * x; });//!!
-
-	layer l(kappa);
-	auto field1 = l.observed(points);
-	auto mat = l.MatrixRho(columns, rows, points);
-	*/
 
 	Parameters::smooth_params.emplace_back([](double x) {return 1; });
 	Parameters::smooth_params.emplace_back([](double x) {return 1 + 0.1 * x; });//!!
 
 	layer l(kappa);
 	auto field1 = l.observed(points);
-	//auto mat = l.MatrixRho(columns, rows);
 
 	Parameters::smooth_params[0] = [](double x) {return 1; };
 	Parameters::smooth_params[1] = [](double x) {return 1; };
+
+
 	layer l1(kappa);
 	auto field2 = l1.observed(points);
 	auto mat = l1.MatrixRho(columns, rows);
 
-	std::vector<double> field = field1 - field2;
+	/*std::vector<double> field = field1 - field2;
 
 	std::vector<double> exact_solution(points.size());
 	const double h_y = 1.0 / points.size();
