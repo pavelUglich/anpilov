@@ -173,7 +173,7 @@ std::vector<std::vector<double>> layer::MatrixMu(size_t columns, size_t rows)
 	std::vector<double> points_x2(rows);
 	std::vector<double> points_xi(columns);
 	std::vector<std::complex<double>> residuals;
-	for (size_t i = 0; i < rows; i++) {
+	for (size_t i = 1; i < rows; i++) {
 		points_x2[i] = (i + 0.5) / rows;
 	}
 	points_x2.push_back(1.0);
@@ -189,10 +189,10 @@ std::vector<std::vector<double>> layer::MatrixMu(size_t columns, size_t rows)
 		{
 			for (size_t iii = 0; iii < columns; iii++)
 			{
-				std::complex<double> multiplier = im*exp(points_xi[iii] * im * root);
-				const auto item = (2.0 * solution[ii][1] * (solution[ii][3] - solution[ii][1] * 0.5 * denum[5] / denum[3]) - im * solution[ii][1] * solution[ii][1] * points_xi[iii]) / denum[3] / denum[3]
-					+ (2.0 * roots[ii] * solution[ii][0] * (solution[ii][0] + roots[ii] * solution[ii][2] - roots[ii] * solution[ii][0] * denum[5] / denum[3]) - im * roots[ii] * solution[ii][0] * roots[ii] * solution[ii][0] * points_xi[iii]) / denum[3] / denum[3];
-				result[iii][ii] += item * multiplier;
+				std::complex<double> multiplier = exp(points_xi[iii] * im * root);
+				const auto item1 = im * (2.0 * solution[ii][1] * (solution[ii][3] - solution[ii][1] * 0.5 * denum[5] / denum[3]) + im * solution[ii][1] * solution[ii][1] * points_xi[iii]) / denum[3] / denum[3];
+				const auto item2 = im * (2.0 * root * solution[ii][0] * (root * solution[ii][2] + solution[ii][0] - root * solution[ii][0] * 0.5 * denum[5] / denum[3]) + im * root * root * solution[ii][0] * solution[ii][0] * points_xi[iii]) / denum[3] / denum[3];
+				result[iii][ii] += (item1 + item2) * multiplier;
 			}
 		}
 	}
@@ -202,7 +202,7 @@ std::vector<std::vector<double>> layer::MatrixMu(size_t columns, size_t rows)
 	{
 		for (size_t j = 0; j < rows; j++)
 		{
-			realresult[i][j] += result[i][j].real();
+			realresult[i][j] += result[i][j].real() / columns;
 		}
 	}
 	return realresult;
