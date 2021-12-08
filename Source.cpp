@@ -282,7 +282,7 @@ int main()
 
 	layer l1(kappa);
 	auto field2 = l1.observed(points);
-	auto mat = l1.MatrixRho(columns, rows);
+	auto mat = l1.MatrixMu(columns, rows);
 
 	/*std::vector<double> field = field1 - field2;
 

@@ -1,5 +1,7 @@
 #include "Layer.h"
 
+#include <complex.h>
+
 const std::complex<double> im = { 0,1 };
 
 std::vector<std::function<std::complex<double>(double, const std::vector<std::complex<double>>&)>> layer::get_equation(std::complex<double> alpha, size_t size) const
@@ -129,8 +131,8 @@ std::vector<std::complex<double>> layer::residualSet()
 std::vector<std::vector<double>> layer::MatrixRho(size_t columns, size_t rows) const
 {
 	const auto h = 1.0 / columns;
-	std::vector<double> points_x2(rows);
-	std::vector<double> points_xi(columns);
+	std::vector<double> points_x2(rows); // значения x_2
+	std::vector<double> points_xi(columns); // значения \xi
 	std::vector<std::complex<double>> residuals;
 	for (size_t i = 0; i < rows; i++) {
 		points_x2[i] = (i + 0.5) / rows;
@@ -173,7 +175,7 @@ std::vector<std::vector<double>> layer::MatrixMu(size_t columns, size_t rows)
 	std::vector<double> points_x2(rows);
 	std::vector<double> points_xi(columns);
 	std::vector<std::complex<double>> residuals;
-	for (size_t i = 1; i < rows; i++) {
+	for (size_t i = 0; i < rows; i++) {
 		points_x2[i] = (i + 0.5) / rows;
 	}
 	points_x2.push_back(1.0);
@@ -190,23 +192,29 @@ std::vector<std::vector<double>> layer::MatrixMu(size_t columns, size_t rows)
 			for (size_t iii = 0; iii < columns; iii++)
 			{
 				std::complex<double> multiplier = exp(points_xi[iii] * im * root);
-				const auto item1 = im * (2.0 * solution[ii][1] * (solution[ii][3] - solution[ii][1] * 0.5 * denum[5] / denum[3]) + im * solution[ii][1] * solution[ii][1] * points_xi[iii]) / denum[3] / denum[3];
-				const auto item2 = im * (2.0 * root * solution[ii][0] * (root * solution[ii][2] + solution[ii][0] - root * solution[ii][0] * 0.5 * denum[5] / denum[3]) + im * root * root * solution[ii][0] * solution[ii][0] * points_xi[iii]) / denum[3] / denum[3];
-				result[iii][ii] += (item1 + item2) * multiplier;
+				const auto item1 = im * (2.0 * solution[ii][1] * (solution[ii][3] -
+					solution[ii][1] * 0.5 * denum[5] / denum[3])
+					+ im * solution[ii][1] * solution[ii][1] * points_xi[iii]) / denum[3]
+					/ denum[3];
+				const auto a02 = root * solution[ii][0];
+				const auto a12 = root * solution[ii][2] + solution[ii][0];
+				const auto item2 = im * (2.0 * a02 * (a12 - a02 * 0.5 *
+					denum[5] / denum[3]) + im * a02 * a02 * points_xi[iii]) / denum[3] / denum[3];
+				result[iii][ii] += -(item1 + item2) * multiplier;
 			}
 		}
 	}
-
 	std::vector<std::vector<double>> realresult(columns, std::vector<double>(rows));
 	for (size_t i = 0; i < columns; i++)
 	{
 		for (size_t j = 0; j < rows; j++)
 		{
-			realresult[i][j] += result[i][j].real() / columns;
+			realresult[i][j] = result[i][j].real() / columns;
 		}
 	}
 	return realresult;
 }
+
 
 std::vector<std::complex<double>> layer::getRoots()
 {
