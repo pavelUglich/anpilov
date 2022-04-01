@@ -53,7 +53,6 @@ class Matrix
 	std::vector<std::vector<T>> elements; // вектор элементов
 	void setElements(const std::vector<std::vector<T>>& elements);
 
-protected:
 public:
 	std::vector<std::vector<T>> getElements() const;
 

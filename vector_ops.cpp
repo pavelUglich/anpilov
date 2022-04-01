@@ -87,7 +87,7 @@ double normalize(std::vector<double>& vector)
 	return _norm;
 }
 
-template<class T>
+//template<class T>
 /*std::vector<double> operator*(const std::vector<std::vector<double>>& matrix,
 	const std::vector<double>& vector)
 {

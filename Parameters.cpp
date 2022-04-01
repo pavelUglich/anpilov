@@ -17,7 +17,8 @@ double Parameters::get_value(double t, size_t param_num)
 	}
 	if (i >= points.size())
 	{
-		throw std::invalid_argument("");
+		//throw std::invalid_argument("");
+		return piecewise_linear_params.back()[param_num];
 	}
 	if (!i)
 	{
